@@ -2,13 +2,13 @@ import type { FastMCP } from 'fastmcp';
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { getGmailClient } from '../../clients.js';
-import { prepareMimeRequest } from './helpers.js';
+import { attachmentsParameter, prepareMimeRequest } from './helpers.js';
 
 export function register(server: FastMCP) {
   server.addTool({
     name: 'createDraft',
     description:
-      'Creates a Gmail draft (does NOT send). Use this for AI-composed emails that the user should review before sending. The draft appears in the Gmail Drafts folder and can be sent later with sendDraft, edited with updateDraft, or deleted with deleteDraft. Supports threading via replyToMessageId.',
+      'Creates a Gmail draft (does NOT send). Use this for AI-composed emails that the user should review before sending. The draft appears in the Gmail Drafts folder and can be sent later with sendDraft, edited with updateDraft, or deleted with deleteDraft. Supports threading via replyToMessageId and local file attachments. The response includes the From address of the account the draft was created in.',
     parameters: z.strictObject({
       to: z
         .union([z.string(), z.array(z.string()).min(1)])
@@ -23,27 +23,31 @@ export function register(server: FastMCP) {
         .describe(
           'Optional Gmail message ID to draft a reply to. The draft is threaded with the original.'
         ),
+      attachments: attachmentsParameter,
     }),
     execute: async (args, { log }) => {
       const gmail = await getGmailClient();
 
       try {
-        const { raw, threadId, toList } = await prepareMimeRequest(gmail, args);
+        const { message, media, toList, attachments } = await prepareMimeRequest(gmail, args);
         log.info(
           `Creating Gmail draft to ${toList.join(', ')}${
             args.replyToMessageId ? ` (reply to ${args.replyToMessageId})` : ''
           }`
         );
+        for (const { filename, size } of attachments)
+          log.info(`Attaching ${filename} (${size} bytes)`);
 
-        const response = await gmail.users.drafts.create({
-          userId: 'me',
-          requestBody: {
-            message: {
-              raw,
-              ...(threadId ? { threadId } : {}),
-            },
-          },
-        });
+        const [response, profile] = await Promise.all([
+          gmail.users.drafts.create({
+            userId: 'me',
+            requestBody: { message },
+            ...(media ? { media } : {}),
+          }),
+          // Only reports which mailbox the draft landed in; failing it must not
+          // turn a created draft into an error the caller would retry.
+          gmail.users.getProfile({ userId: 'me' }).catch(() => null),
+        ]);
 
         return JSON.stringify(
           {
@@ -51,8 +55,10 @@ export function register(server: FastMCP) {
             draftId: response.data.id,
             messageId: response.data.message?.id,
             threadId: response.data.message?.threadId,
+            from: profile?.data.emailAddress ?? null,
             to: toList,
             subject: args.subject,
+            attachments,
             message: `Draft created. Use sendDraft with draftId="${response.data.id}" to send it, or updateDraft to edit it first.`,
           },
           null,

@@ -2,13 +2,13 @@ import type { FastMCP } from 'fastmcp';
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { getGmailClient } from '../../clients.js';
-import { prepareMimeRequest } from './helpers.js';
+import { attachmentsParameter, prepareMimeRequest } from './helpers.js';
 
 export function register(server: FastMCP) {
   server.addTool({
     name: 'updateDraft',
     description:
-      'Replaces the contents of an existing Gmail draft. The new contents fully overwrite the old draft (this is a full replace, not a patch). Use this when iterating on an AI-composed draft before sending.',
+      'Replaces the contents of an existing Gmail draft. The new contents fully overwrite the old draft (this is a full replace, not a patch), attachments included: pass attachments again or the draft loses them. Use this when iterating on an AI-composed draft before sending.',
     parameters: z.strictObject({
       draftId: z.string().describe('The Gmail draft ID to update.'),
       to: z
@@ -22,23 +22,22 @@ export function register(server: FastMCP) {
         .string()
         .optional()
         .describe('Optional Gmail message ID to thread the draft with.'),
+      attachments: attachmentsParameter,
     }),
     execute: async (args, { log }) => {
       const gmail = await getGmailClient();
       log.info(`Updating Gmail draft ${args.draftId}`);
 
       try {
-        const { raw, threadId, toList } = await prepareMimeRequest(gmail, args);
+        const { message, media, toList, attachments } = await prepareMimeRequest(gmail, args);
+        for (const { filename, size } of attachments)
+          log.info(`Attaching ${filename} (${size} bytes)`);
 
         const response = await gmail.users.drafts.update({
           userId: 'me',
           id: args.draftId,
-          requestBody: {
-            message: {
-              raw,
-              ...(threadId ? { threadId } : {}),
-            },
-          },
+          requestBody: { message },
+          ...(media ? { media } : {}),
         });
 
         return JSON.stringify(
@@ -49,6 +48,7 @@ export function register(server: FastMCP) {
             threadId: response.data.message?.threadId,
             to: toList,
             subject: args.subject,
+            attachments,
             message: `Draft ${args.draftId} updated.`,
           },
           null,

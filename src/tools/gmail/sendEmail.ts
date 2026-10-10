@@ -28,7 +28,9 @@ export function register(server: FastMCP) {
       const gmail = await getGmailClient();
 
       try {
-        const { raw, threadId, toList } = await prepareMimeRequest(gmail, args);
+        // No attachments here: sendEmail goes out with no review, so files only
+        // leave through a draft (createDraft / updateDraft).
+        const { message, toList } = await prepareMimeRequest(gmail, args);
         log.info(
           `Sending Gmail message to ${toList.join(', ')}${
             args.replyToMessageId ? ` (reply to ${args.replyToMessageId})` : ''
@@ -37,10 +39,7 @@ export function register(server: FastMCP) {
 
         const send = await gmail.users.messages.send({
           userId: 'me',
-          requestBody: {
-            raw,
-            ...(threadId ? { threadId } : {}),
-          },
+          requestBody: message,
         });
 
         return JSON.stringify(
