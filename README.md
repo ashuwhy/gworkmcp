@@ -1,3 +1,5 @@
+> Fork of [a-bonus/google-docs-mcp](https://github.com/a-bonus/google-docs-mcp). What I added: file attachments on Gmail `createDraft` and `updateDraft`, confined to the directories in `GMAIL_ATTACHMENT_ROOTS` ([details](src/tools/gmail/README.md#attachments)), and the account's `from` address in the `createDraft` response.
+
 # Google Docs, Sheets, Drive, Gmail & Calendar MCP Server
 
 [![MCP Toplist](https://mcptoplist.com/badge/glama%2Fa-bonus%2Fgoogle-docs-mcp.svg)](https://mcptoplist.com/server/glama%2Fa-bonus%2Fgoogle-docs-mcp)
@@ -352,6 +354,7 @@ Visit the server root URL (`/`) for setup instructions and a ready-to-copy clien
 | `GCLOUD_PROJECT`                 | GCP project ID for Firestore (required when `TOKEN_STORE=firestore`)                                                          |
 | `MCP_STATELESS`                  | Set to `true` for serverless deployments (Cloud Run, etc.) — disables session tracking to survive scale-to-zero               |
 | `GOOGLE_DOCS_MCP_DOWNLOAD_ROOTS` | Directories `downloadFile` may write to in stdio mode, delimited by `:` (`;` on Windows). Defaults to the working directory   |
+| `GMAIL_ATTACHMENT_ROOTS`         | Directories Gmail drafts may attach files from in stdio mode, delimited by `:` (`;` on Windows). Unset disables attachments   |
 
 ### Setup
 
