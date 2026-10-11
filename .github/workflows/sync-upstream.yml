@@ -6,40 +6,80 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency: sync-upstream
 
 jobs:
-  sync:
+  # Runs upstream's code (npm ci, build, tests), so it gets no write token. A
+  # later step on the same runner can be reached through .git/hooks,
+  # GITHUB_PATH, or a process left running, so the push lives in its own job.
+  merge:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      merged: ${{ steps.merge.outputs.merged }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          # npm ci and upstream's tests run before the push; keep the write
-          # token out of .git/config where an install script could read it.
           persist-credentials: false
 
+      # No npm cache: it is shared with CI runs and saved after upstream's code ran.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Merge upstream/main
+        id: merge
         run: |
           git config user.name "Ashutosh Sharma"
           git config user.email "ashutoshsharmawhy@gmail.com"
+          before=$(git rev-parse HEAD)
           scripts/sync-upstream.sh
+          if [ "$(git rev-parse HEAD)" != "$before" ]; then
+            git bundle create "$RUNNER_TEMP/sync.bundle" "$before..HEAD"
+            echo "merged=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      # GITHUB_TOKEN cannot push changes to .github/workflows, so an upstream
-      # commit that touches a workflow fails here. Sync by hand in that case.
-      - name: Push
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - if: steps.merge.outputs.merged == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-bundle
+          path: ${{ runner.temp }}/sync.bundle
+          retention-days: 1
+
+  push:
+    needs: merge
+    if: needs.merge.outputs.merged == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sync-bundle
+          path: ${{ runner.temp }}
+
+      # The merge job could have rewritten the bundle, so push only a merge of
+      # this main with the current upstream main. GITHUB_TOKEN cannot push
+      # changes to .github/workflows; an upstream commit touching one fails
+      # here and needs a sync by hand.
+      - name: Check and push the merge
         run: |
-          gh auth setup-git
-          git push origin HEAD:main
+          git fetch --no-tags https://github.com/a-bonus/google-docs-mcp.git main
+          upstream=$(git rev-parse FETCH_HEAD)
+          git fetch --no-tags "$RUNNER_TEMP/sync.bundle" HEAD
+          merge=$(git rev-parse FETCH_HEAD)
+          test "$(git rev-parse "$merge^1")" = "$(git rev-parse HEAD)"
+          test "$(git rev-parse "$merge^2")" = "$upstream"
+          git push origin "${merge}:refs/heads/main"
