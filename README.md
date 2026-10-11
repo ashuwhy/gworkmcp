@@ -120,6 +120,24 @@ npm run format:check
 
 ci runs all three. more in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## upstream updates
+
+[sync-upstream.yml](.github/workflows/sync-upstream.yml) merges a-bonus's `main` into mine every day at 04:17 utc, or on demand from the actions tab. it runs [scripts/sync-upstream.sh](scripts/sync-upstream.sh), which:
+
+- keeps this readme as it is, whatever upstream does to theirs
+- takes upstream's `package.json` and lockfile, then puts back the `@ashuwhy/gworkmcp` name and the `gworkmcp` command. version bumps and new dependencies come through
+- stops on a conflict anywhere else, or when format, build or tests fail, and pushes nothing
+
+a failed run emails me. besides real conflicts, that happens whenever upstream edits a file in `.github/workflows`, since the action's token can't push those. either way, sync here instead:
+
+```bash
+scripts/sync-upstream.sh
+```
+
+it stops at the first problem with the merge uncommitted. fix what it names, `git commit`, `git push`. a clean run commits and builds, so only the push is left.
+
+github turns the daily schedule off after 60 days without a commit to the repo. switch it back on in the actions tab.
+
 ## license
 
 mit, see [LICENSE](LICENSE). same license as upstream, and the server underneath is a-bonus's work.
