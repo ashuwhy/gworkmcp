@@ -3,6 +3,7 @@
   "version": "1.11.3",
   "type": "module",
   "bin": {
+    "gworkmcp": "dist/index.js",
     "google-docs-mcp": "dist/index.js"
   },
   "files": [
