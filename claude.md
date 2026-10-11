@@ -30,6 +30,7 @@ The server supports Google Shared Drives. All Drive file operations (`files.list
 - **fixListFormatting:** Experimental, may not work reliably
 - **Gmail hard delete:** `trashMessage` only moves to Trash (reversible). Permanent deletion requires the full `https://mail.google.com/` scope, which is not requested.
 - **Gmail attachments:** `getMessage` exposes attachment metadata only — no download of attachment bytes yet.
+- **Gmail draft attachments:** `createDraft` and `updateDraft` attach local files only from the directories in `GMAIL_ATTACHMENT_ROOTS`. Unset means every attachment is refused.
 - **Gmail send format:** `sendEmail` is plain-text only. HTML bodies are delivered as literal text.
 - **Calendar scope:** `calendar.events` covers event CRUD only. Cannot create or delete entire calendars.
 - **Calendar recurring events:** `updateEvent` and `deleteEvent` operate on the entire series unless you target a specific instance ID from `listEvents` with `singleEvents=true`.

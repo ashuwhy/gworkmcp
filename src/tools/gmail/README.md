@@ -15,14 +15,14 @@ Tools for reading, drafting, sending, deleting, organizing, and triaging Gmail m
 
 ## Drafts (compose / review / send)
 
-| Tool          | Description                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| `createDraft` | Creates a draft instead of sending. Use this when an AI composes an email the user should review |
-| `listDrafts`  | Lists drafts with recipients, subject, and snippet                                               |
-| `getDraft`    | Fetches one draft with full headers and body                                                     |
-| `updateDraft` | Replaces a draft's contents (full replace, not patch). Use to iterate before sending             |
-| `sendDraft`   | Sends an existing draft by ID — pairs with `createDraft` for the compose-review-send loop        |
-| `deleteDraft` | Permanently deletes a draft. Not moved to Trash — gone                                           |
+| Tool          | Description                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createDraft` | Creates a draft instead of sending. Use this when an AI composes an email the user should review                                                 |
+| `listDrafts`  | Lists drafts with recipients, subject, and snippet                                                                                               |
+| `getDraft`    | Fetches one draft with full headers, body, and attachment metadata                                                                               |
+| `updateDraft` | Replaces a draft's contents (full replace, not patch), keeping its thread unless `replyToMessageId` names another. Use to iterate before sending |
+| `sendDraft`   | Sends an existing draft by ID — pairs with `createDraft` for the compose-review-send loop                                                        |
+| `deleteDraft` | Permanently deletes a draft. Not moved to Trash — gone                                                                                           |
 
 `createDraft` also returns `from`, the address of the account the draft was created in.
 
@@ -37,10 +37,10 @@ Tools for reading, drafting, sending, deleting, organizing, and triaging Gmail m
 A tool that reads local files and mails them is an exfiltration channel if a prompt-injected message can steer it, so the boundary is strict:
 
 - Off until you opt in. Set `GMAIL_ATTACHMENT_ROOTS` in the server's `env` to absolute directories, delimited by `:` (`;` on Windows). While it is unset every attachment is refused. A root that contains your home directory (`/`, `/Users`, or the home folder itself) is refused as well, since it would expose `~/.ssh`. Point it at a folder that only holds files you mean to send.
-- Each path goes through `realpath` before the check, so `../` and symlinks cannot leave a root. Directories, FIFOs, and missing files are rejected.
+- Each path goes through `realpath` before the check, so `../` and symlinks cannot leave a root. Directories, FIFOs, and missing files are rejected. A missing file and a file outside the roots get the same error, which never shows the resolved path, so the error cannot be used to probe the disk.
 - 18,000,000 bytes combined per message, checked with `stat` before anything is read. Gmail refuses messages over 25 MB and base64 adds about a third.
 - Messages with attachments go to Gmail's upload endpoint as `message/rfc822` (documented limit 35 MiB). The API reference gives no limit for the `raw` field in a JSON body, so plain-text messages keep using `raw` exactly as before.
-- Content-Type comes from the extension: `png`, `jpg`/`jpeg`, `gif`, `webp`, `pdf`, `txt`, `csv`, `zip`. Anything else is `application/octet-stream`. Non-ASCII file names use RFC 2231 (`filename*=UTF-8''...`).
+- Content-Type comes from the extension: `png`, `jpg`/`jpeg`, `gif`, `webp`, `pdf`, `txt`, `csv`, `zip`. Anything else is `application/octet-stream`. Non-ASCII file names use RFC 2231 (`filename*=UTF-8''...`). Control characters in a file name become `_`.
 - Logs record file names and sizes, never contents.
 - `sendEmail` takes no attachments, because nothing reviews it before it goes out. `sendDraft` can still send an attachment draft immediately, so keep it behind your MCP client's approval prompt.
 - Unavailable in remote (`httpStream`) mode, where a path would name a file on the shared server.

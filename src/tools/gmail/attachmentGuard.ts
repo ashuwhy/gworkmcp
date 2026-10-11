@@ -98,20 +98,15 @@ export async function loadAttachments(
       throw new Error(`Attachment paths must be absolute, got "${filePath}".`);
     }
 
-    let realPath: string;
-    try {
-      realPath = await fsp.realpath(filePath);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') throw new Error(`Attachment not found: "${filePath}".`);
-      throw new Error(`Cannot resolve attachment "${filePath}": ${error.code || error.message}.`);
-    }
-
-    if (!roots.some((root) => isInside(realPath, root))) {
-      throw new Error(
-        `Attachment "${filePath}" resolves to "${realPath}", which is outside ` +
-          `GMAIL_ATTACHMENT_ROOTS (${roots.map((root) => `"${root}"`).join(', ')}).`
-      );
-    }
+    // One message for missing, unreadable, and outside-the-roots alike, without
+    // the resolved path: anything more tells an injected prompt whether
+    // ~/.ssh/id_ed25519 exists or where a symlink leads.
+    const notFound = new Error(
+      `Attachment "${filePath}" was not found inside GMAIL_ATTACHMENT_ROOTS ` +
+        `(${roots.map((root) => `"${root}"`).join(', ')}).`
+    );
+    const realPath = await fsp.realpath(filePath).catch(() => null);
+    if (!realPath || !roots.some((root) => isInside(realPath, root))) throw notFound;
 
     // Checked before open(): opening a FIFO blocks until a writer shows up.
     const stat = await fsp.stat(realPath);

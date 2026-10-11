@@ -8,7 +8,7 @@ export function register(server: FastMCP) {
   server.addTool({
     name: 'updateDraft',
     description:
-      'Replaces the contents of an existing Gmail draft. The new contents fully overwrite the old draft (this is a full replace, not a patch), attachments included: pass attachments again or the draft loses them. Use this when iterating on an AI-composed draft before sending.',
+      'Replaces the contents of an existing Gmail draft. The new contents fully overwrite the old draft (this is a full replace, not a patch), attachments included: pass attachments again or the draft loses them. The draft stays in its thread unless replyToMessageId names another message. Use this when iterating on an AI-composed draft before sending.',
     parameters: z.strictObject({
       draftId: z.string().describe('The Gmail draft ID to update.'),
       to: z

@@ -1,6 +1,6 @@
 // Tests for the Gmail MIME builder. Without attachments the output must stay
-// byte for byte what upstream produced: the expected strings below were
-// captured from the upstream 1.11.3 build. With attachments it becomes
+// byte for byte what 1.11.3 produced: the expected strings below were
+// captured from that build. With attachments it becomes
 // multipart/mixed with the text part first.
 
 import { describe, it, expect } from 'vitest';
@@ -39,7 +39,7 @@ function decodeBase64Part(content: string): Buffer {
 }
 
 describe('buildMimeMessage without attachments', () => {
-  const upstream = {
+  const before = {
     minimal: {
       opts: {
         to: ['support@store.example'],
@@ -94,11 +94,11 @@ describe('buildMimeMessage without attachments', () => {
     },
   };
 
-  it.each(Object.entries(upstream))('matches upstream output: %s', (_, { opts, expected }) => {
+  it.each(Object.entries(before))('matches the 1.11.3 output: %s', (_, { opts, expected }) => {
     expect(buildMimeMessage(opts)).toBe(expected);
   });
 
-  it.each(Object.entries(upstream))(
+  it.each(Object.entries(before))(
     'treats an empty attachments array as none: %s',
     (_, { opts, expected }) => {
       expect(buildMimeMessage({ ...opts, attachments: [] })).toBe(expected);

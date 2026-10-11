@@ -2,13 +2,13 @@ import type { FastMCP } from 'fastmcp';
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
 import { getGmailClient } from '../../clients.js';
-import { findHeaderValue, extractMessageBody } from './helpers.js';
+import { findHeaderValue, extractMessageBody, collectAttachments } from './helpers.js';
 
 export function register(server: FastMCP) {
   server.addTool({
     name: 'getDraft',
     description:
-      'Fetches a single Gmail draft by ID with full headers and body. Use listDrafts to discover draft IDs.',
+      'Fetches a single Gmail draft by ID with full headers, body, and a list of attachments (metadata only). Use listDrafts to discover draft IDs.',
     parameters: z.strictObject({
       draftId: z.string().describe('The Gmail draft ID, typically from listDrafts results.'),
     }),
@@ -44,6 +44,7 @@ export function register(server: FastMCP) {
               date: findHeaderValue(headers, 'Date'),
             },
             body: { text, html },
+            attachments: collectAttachments(msg?.payload),
           },
           null,
           2

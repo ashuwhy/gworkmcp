@@ -1,34 +1,8 @@
 import type { FastMCP } from 'fastmcp';
 import { UserError } from 'fastmcp';
 import { z } from 'zod';
-import { gmail_v1 } from 'googleapis';
 import { getGmailClient } from '../../clients.js';
-import { findHeaderValue, extractMessageBody } from './helpers.js';
-
-function collectAttachments(payload?: gmail_v1.Schema$MessagePart): Array<{
-  partId: string | null;
-  filename: string;
-  mimeType: string;
-  size: number;
-  attachmentId: string | null;
-}> {
-  const out: ReturnType<typeof collectAttachments> = [];
-  if (!payload) return out;
-  const walk = (part: gmail_v1.Schema$MessagePart) => {
-    if (part.filename && part.body?.attachmentId) {
-      out.push({
-        partId: part.partId ?? null,
-        filename: part.filename,
-        mimeType: part.mimeType ?? 'application/octet-stream',
-        size: part.body.size ?? 0,
-        attachmentId: part.body.attachmentId ?? null,
-      });
-    }
-    if (part.parts) for (const sub of part.parts) walk(sub);
-  };
-  walk(payload);
-  return out;
-}
+import { findHeaderValue, extractMessageBody, collectAttachments } from './helpers.js';
 
 export function register(server: FastMCP) {
   server.addTool({

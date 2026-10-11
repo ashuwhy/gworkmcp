@@ -1,7 +1,9 @@
 // Tests for the Gmail attachment read boundary. The threat is a prompt-injected
 // agent attaching ~/.ssh/id_ed25519, so every way of naming a file outside the
 // roots gets a case: absolute path, ../ traversal, symlinked file, symlinked
-// directory. Each rejection also has to happen before any file is opened.
+// directory. Each rejection also has to happen before any file is opened, and
+// must not tell the agent whether a file outside the roots exists or where a
+// symlink points, or the error itself becomes a probe of the disk.
 
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -116,20 +118,29 @@ describe('loadAttachments', () => {
 describe('loadAttachments rejections', () => {
   it('rejects a file outside the roots', async () => {
     await expect(loadAttachments([secret], [root])).rejects.toThrow(
-      /outside GMAIL_ATTACHMENT_ROOTS/
+      /not found inside GMAIL_ATTACHMENT_ROOTS/
     );
+  });
+
+  it('answers the same whether a file outside the roots exists or not', async () => {
+    const missing = path.join(outside, 'id_rsa');
+    const existing = await rejectionMessage(loadAttachments([secret], [root]));
+    const absent = await rejectionMessage(loadAttachments([missing], [root]));
+    expect(absent?.replace(missing, '<path>')).toBe(existing?.replace(secret, '<path>'));
   });
 
   it('rejects ../ traversal out of a root', async () => {
     const traversal = [root, '..', 'private', 'id_ed25519'].join(path.sep);
     expect(traversal).toContain(`${path.sep}..${path.sep}`);
-    await expect(loadAttachments([traversal], [root])).rejects.toThrow(/outside/);
+    await expect(loadAttachments([traversal], [root])).rejects.toThrow(/not found inside/);
   });
 
-  it('rejects a symlinked file that points outside the root', async () => {
+  it('rejects a symlinked file that points outside the root without naming the target', async () => {
     const link = path.join(root, 'innocent.png');
     fs.symlinkSync(secret, link);
-    await expect(loadAttachments([link], [root])).rejects.toThrow(`resolves to "${secret}"`);
+    const message = await rejectionMessage(loadAttachments([link], [root]));
+    expect(message).toMatch(/not found inside GMAIL_ATTACHMENT_ROOTS/);
+    expect(message).not.toContain(outside);
   });
 
   it('rejects a file under a symlinked directory that points outside the root', async () => {
@@ -137,7 +148,7 @@ describe('loadAttachments rejections', () => {
     fs.symlinkSync(outside, linkDir, 'dir');
     const target = path.join(linkDir, 'id_ed25519');
     expect(target.startsWith(root + path.sep)).toBe(true); // passes a naive prefix check
-    await expect(loadAttachments([target], [root])).rejects.toThrow(/outside/);
+    await expect(loadAttachments([target], [root])).rejects.toThrow(/not found inside/);
   });
 
   it('rejects a directory', async () => {
@@ -187,7 +198,7 @@ describe('loadAttachments rejections', () => {
 
   it('reads nothing when any path in the set is rejected', async () => {
     const open = vi.spyOn(fsp, 'open');
-    await expect(loadAttachments([png, secret], [root])).rejects.toThrow(/outside/);
+    await expect(loadAttachments([png, secret], [root])).rejects.toThrow(/not found inside/);
     expect(open).not.toHaveBeenCalled();
   });
 });

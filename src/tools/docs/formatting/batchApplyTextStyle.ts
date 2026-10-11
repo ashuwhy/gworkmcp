@@ -16,8 +16,8 @@ export function register(server: FastMCP) {
       'Applies character-level formatting (bold, italic, color, font, etc.) to MANY ranges in a single tool ' +
       'call, instead of one applyTextStyle call per range. Built for scripts that colour dozens or hundreds of ' +
       'cues: do one readDocument (format="json") pass, compute every range from that one read, then pass them ' +
-      "all here as one operations[] array. Internally chunks into batches of up to 50 requests per Docs API " +
-      'call (Google\'s per-request-array limit), so 100+ operations still cost only 2-3 API calls instead of ' +
+      'all here as one operations[] array. Internally chunks into batches of up to 50 requests per Docs API ' +
+      "call (Google's per-request-array limit), so 100+ operations still cost only 2-3 API calls instead of " +
       '100+ round trips.',
     parameters: BatchApplyTextStyleToolParameters,
     execute: async (args: BatchApplyTextStyleToolArgs, { log }) => {

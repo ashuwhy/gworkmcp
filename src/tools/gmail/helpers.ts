@@ -69,13 +69,14 @@ export interface MimeMessageOptions {
 }
 
 /**
- * Plain text/plain without attachments (unchanged from upstream, byte for
- * byte). With attachments, multipart/mixed: the text part first, then one
- * base64 part per file.
+ * Plain text/plain without attachments (byte for byte what 1.11.3 sent).
+ * With attachments, multipart/mixed: the text part first, then one base64
+ * part per file.
  */
 export function buildMimeMessage(opts: MimeMessageOptions): string {
   const attachments = opts.attachments ?? [];
-  const boundary = attachments.length > 0 ? `gworkmcp-${randomBytes(16).toString('hex')}` : null;
+  const boundary =
+    attachments.length > 0 ? `mime-boundary-${randomBytes(16).toString('hex')}` : null;
   const textHeaders = [
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: 8bit',
@@ -139,6 +140,25 @@ export async function getReplyContext(
   return { threadId, inReplyTo, references };
 }
 
+/**
+ * Thread and reply headers of the draft about to be replaced. updateDraft is a
+ * full replace, so without these a reply draft drops out of its conversation
+ * whenever the caller leaves out replyToMessageId.
+ */
+export async function getDraftThreadContext(
+  gmail: gmail_v1.Gmail,
+  draftId: string
+): Promise<{ threadId: string | undefined; inReplyTo: string | null; references: string | null }> {
+  const draft = await gmail.users.drafts.get({ userId: 'me', id: draftId, format: 'metadata' });
+  const message = draft.data.message;
+  const headers = message?.payload?.headers;
+  return {
+    threadId: message?.threadId ?? undefined,
+    inReplyTo: findHeaderValue(headers, 'In-Reply-To'),
+    references: findHeaderValue(headers, 'References'),
+  };
+}
+
 export const attachmentsParameter = z
   .array(z.string())
   .optional()
@@ -155,6 +175,8 @@ export interface DraftRequestArgs {
   cc?: string[];
   bcc?: string[];
   replyToMessageId?: string;
+  /** The draft being replaced. Its thread is kept unless replyToMessageId names another. */
+  draftId?: string;
   attachments?: string[];
 }
 
@@ -177,26 +199,24 @@ export async function prepareMimeRequest(
   args: DraftRequestArgs
 ): Promise<PreparedMimeRequest> {
   const toList = Array.isArray(args.to) ? args.to : [args.to];
-  let threadId: string | undefined;
-  let inReplyTo: string | null = null;
-  let references: string | null = null;
 
   // Before any Gmail call, so a rejected path costs no request.
   const files = args.attachments?.length
     ? await loadAttachments(args.attachments, parseAttachmentRoots())
     : [];
   const attachments = files.map(({ filename, content }) => ({
-    filename,
+    // RFC 2231 already keeps a CR or LF out of the headers, but Gmail cuts the
+    // displayed name at the first control character.
+    filename: filename.replace(/[\x00-\x1F\x7F]/g, '_'),
     contentType: attachmentContentType(filename),
     content,
   }));
 
-  if (args.replyToMessageId) {
-    const ctx = await getReplyContext(gmail, args.replyToMessageId);
-    threadId = ctx.threadId;
-    inReplyTo = ctx.inReplyTo;
-    references = ctx.references;
-  }
+  const { threadId, inReplyTo, references } = args.replyToMessageId
+    ? await getReplyContext(gmail, args.replyToMessageId)
+    : args.draftId
+      ? await getDraftThreadContext(gmail, args.draftId)
+      : { threadId: undefined, inReplyTo: null, references: null };
 
   const mime = buildMimeMessage({
     to: toList,
@@ -236,6 +256,31 @@ export async function prepareMimeRequest(
 export function decodeBase64Url(data?: string | null): string {
   if (!data) return '';
   return Buffer.from(data, 'base64url').toString('utf-8');
+}
+
+export function collectAttachments(payload?: gmail_v1.Schema$MessagePart): Array<{
+  partId: string | null;
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId: string | null;
+}> {
+  const out: ReturnType<typeof collectAttachments> = [];
+  if (!payload) return out;
+  const walk = (part: gmail_v1.Schema$MessagePart) => {
+    if (part.filename && part.body?.attachmentId) {
+      out.push({
+        partId: part.partId ?? null,
+        filename: part.filename,
+        mimeType: part.mimeType ?? 'application/octet-stream',
+        size: part.body.size ?? 0,
+        attachmentId: part.body.attachmentId ?? null,
+      });
+    }
+    if (part.parts) for (const sub of part.parts) walk(sub);
+  };
+  walk(payload);
+  return out;
 }
 
 /**
