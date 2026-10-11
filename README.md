@@ -6,7 +6,11 @@ my fork of [a-bonus/google-docs-mcp](https://github.com/a-bonus/google-docs-mcp)
 
 - local file attachments on gmail `createDraft` and `updateDraft`, only from folders listed in `GMAIL_ATTACHMENT_ROOTS`
 - the account's `from` address in the `createDraft` reply, so you know which inbox the draft landed in
+- `getDraft` lists a draft's attachments, the way `getMessage` does
+- `updateDraft` keeps a reply draft in its thread when you leave out `replyToMessageId`. upstream moves it to a new one
 - a `gworkmcp` command. `google-docs-mcp` still works as an alias
+
+the gmail changes are also open upstream as [a-bonus/google-docs-mcp#167](https://github.com/a-bonus/google-docs-mcp/pull/167).
 
 same login, token file and scopes as upstream, so an existing sign-in carries over.
 
