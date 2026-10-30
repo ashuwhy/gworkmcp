@@ -64,6 +64,10 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # GITHUB_TOKEN cannot push changes that create or update workflows.
+          # Configure SYNC_PUSH_TOKEN as a fine-grained PAT (contents: write,
+          # workflows: write) so upstream workflow changes can be synced.
+          token: ${{ secrets.SYNC_PUSH_TOKEN || github.token }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -71,9 +75,8 @@ jobs:
           path: ${{ runner.temp }}
 
       # The merge job could have rewritten the bundle, so push only a merge of
-      # this main with the current upstream main. GITHUB_TOKEN cannot push
-      # changes to .github/workflows; an upstream commit touching one fails
-      # here and needs a sync by hand.
+      # this main with the current upstream main. The dedicated token above
+      # allows this isolated job to push upstream workflow changes too.
       - name: Check and push the merge
         run: |
           git fetch --no-tags https://github.com/a-bonus/google-docs-mcp.git main
