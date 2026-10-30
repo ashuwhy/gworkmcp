@@ -9,7 +9,7 @@ export function register(server: FastMCP) {
   server.addTool({
     name: 'createDocument',
     description:
-      'Creates a new empty Google Document. Optionally places it in a specific folder and adds initial text content.',
+      'Creates a new empty Google Document. Optionally places it in a specific folder and adds initial text content. For a native Markdown (.md) file instead, use createMarkdownFile.',
     parameters: z.strictObject({
       title: z.string().min(1).describe('Title for the new document.'),
       parentFolderId: z

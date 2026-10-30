@@ -71,12 +71,9 @@ export function register(server: FastMCP) {
             args.tabId
           )
         );
-        await GDocsHelpers.executeBatchUpdateWithSplitting(
-          docs,
-          args.documentId,
-          insertRequests,
-          log
-        );
+        await GDocsHelpers.executeBatchUpdateWithSplitting(docs, args.documentId, insertRequests, {
+          log,
+        });
 
         const refreshed = await docs.documents.get({
           documentId: args.documentId,

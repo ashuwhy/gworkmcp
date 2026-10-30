@@ -103,12 +103,9 @@ export function register(server: FastMCP) {
           false,
           args.targetTabId
         );
-        await GDocsHelpers.executeBatchUpdateWithSplitting(
-          docs,
-          args.documentId,
-          insertRequests,
-          log
-        );
+        await GDocsHelpers.executeBatchUpdateWithSplitting(docs, args.documentId, insertRequests, {
+          log,
+        });
 
         const targetRes = await docs.documents.get({
           documentId: args.documentId,
@@ -220,12 +217,9 @@ export function register(server: FastMCP) {
         }
 
         if (styleRequests.length > 0) {
-          await GDocsHelpers.executeBatchUpdateWithSplitting(
-            docs,
-            args.documentId,
-            styleRequests,
-            log
-          );
+          await GDocsHelpers.executeBatchUpdateWithSplitting(docs, args.documentId, styleRequests, {
+            log,
+          });
         }
 
         return `Successfully cloned ${args.sourceTableId} into ${args.documentId} at index ${args.index}.`;

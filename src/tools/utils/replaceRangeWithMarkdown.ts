@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getDocsClient } from '../../clients.js';
 import { DocumentIdParameter, MarkdownConversionError } from '../../types.js';
 import * as GDocsHelpers from '../../googleDocsApiHelpers.js';
+import { suggestModeNote } from '../../suggestions.js';
 import { insertMarkdown, formatInsertResult } from '../../markdown-transformer/index.js';
 
 export function register(server: FastMCP) {
@@ -36,6 +37,11 @@ export function register(server: FastMCP) {
         .describe(
           'The ID of the specific tab to modify. If not specified, modifies the first tab.'
         ),
+      suggestMode: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('When true, apply as pending suggestions for review instead of direct edits.'),
     }).refine((data) => data.endIndex > data.startIndex, {
       message: 'endIndex must be greater than startIndex',
       path: ['endIndex'],
@@ -57,11 +63,16 @@ export function register(server: FastMCP) {
         }
 
         log.info(`Deleting content from index ${args.startIndex} to ${args.endIndex}`);
-        await GDocsHelpers.executeBatchUpdate(docs, args.documentId, [
-          {
-            deleteContentRange: { range: deleteRange },
-          },
-        ]);
+        await GDocsHelpers.executeBatchUpdate(
+          docs,
+          args.documentId,
+          [
+            {
+              deleteContentRange: { range: deleteRange },
+            },
+          ],
+          { suggestMode: args.suggestMode }
+        );
         log.info(`Delete complete.`);
 
         // 2. Insert markdown at the start position (which is now where the deleted content was)
@@ -69,11 +80,22 @@ export function register(server: FastMCP) {
         const result = await insertMarkdown(docs, args.documentId, args.markdown, {
           startIndex: args.startIndex,
           tabId: args.tabId,
+          suggestMode: args.suggestMode,
         });
 
         const debugSummary = formatInsertResult(result);
         log.info(debugSummary);
-        return `Successfully replaced range ${args.startIndex}-${args.endIndex} with ${args.markdown.length} characters of markdown.\n\n${debugSummary}`;
+        const base = `Successfully replaced range ${args.startIndex}-${args.endIndex} with ${args.markdown.length} characters of markdown.\n\n${debugSummary}`;
+        if (args.suggestMode) {
+          return (
+            base +
+            suggestModeNote(
+              (result.batchUpdate as any)?.commentUpdateState,
+              (result.batchUpdate as any)?.suggestionResponses
+            )
+          );
+        }
+        return base;
       } catch (error: any) {
         log.error(`Error replacing range with markdown: ${error.message}`);
         if (error instanceof UserError || error instanceof MarkdownConversionError) {

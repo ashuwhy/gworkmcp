@@ -1,7 +1,10 @@
 {
   "name": "@ashuwhy/gworkmcp",
-  "version": "1.11.3",
+  "version": "2.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "gworkmcp": "dist/index.js",
     "google-docs-mcp": "dist/index.js"
@@ -35,8 +38,8 @@
   "dependencies": {
     "@google-cloud/firestore": "^8.3.0",
     "fastmcp": "^4.0.1",
-    "google-auth-library": "^10.5.0",
-    "googleapis": "^171.4.0",
+    "google-auth-library": "^11.1.0",
+    "googleapis": "^184.0.0",
     "markdown-it": "^14.1.0",
     "xsschema": "^0.4.4",
     "zod": "^3.24.2"

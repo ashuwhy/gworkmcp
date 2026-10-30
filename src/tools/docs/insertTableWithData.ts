@@ -156,7 +156,7 @@ export function register(server: FastMCP) {
           docs,
           args.documentId,
           requests,
-          log
+          { log }
         );
 
         return (
